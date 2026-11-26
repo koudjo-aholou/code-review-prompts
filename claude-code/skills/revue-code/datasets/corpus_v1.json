@@ -1,0 +1,269 @@
+{
+  "_schema_version": "1.0",
+  "_corpus_version": "revue-backend-v1",
+  "_n": 13,
+  "_purpose": "Corpus de test pour la revue de diff (SPEC.md) — un cas par décision de conception de SPEC.md, gate machine-checkable quand possible. Réutilisable pour toute future amélioration de la revue de diff, pas seulement ce prompt-ci.",
+  "_notes": "Diffs générés par de vrais `git diff` dans des dépôts jetables (générés par un script non distribué ici) — syntaxiquement garantis et rejoués (`git apply --check`) avant écriture, jamais tapés à la main. Code entièrement synthétique : aucune ligne de code réel d'un dépôt existant. gate.scoring='keyword' = vérifiable par grep sur la sortie du prompt, sans juge. gate.scoring='llm_judge' = nécessite un jugement sémantique, pas encore outillé. AUCUN SCORER N'EXISTE ENCORE — ce fichier est le dataset, pas le harness.",
+  "cases": [
+    {
+      "id": "rb01",
+      "title": "Constante triviale modifiée",
+      "lang": "ts",
+      "tests": "passe soustractive — pas de mur pour un changement d'une ligne",
+      "source_ref": "SPEC.md — verdict `approve` par défaut, RAS si rien à signaler",
+      "gate": {
+        "scoring": "keyword",
+        "expected_verdict_any": [
+          "approve",
+          "comment"
+        ],
+        "forbid_label": "issue",
+        "max_findings": 1
+      },
+      "diff": "diff --git a/src/core/settings.ts b/src/core/settings.ts\n--- a/src/core/settings.ts\n+++ b/src/core/settings.ts\n@@ -1,4 +1,4 @@\n export const settings = {\n   locale: \"en-US\",\n-  pollIntervalMs: 3000,\n+  pollIntervalMs: 5000,\n };\n",
+      "defect_lines": []
+    },
+    {
+      "id": "rb02",
+      "title": "Duplication à 2 occurrences",
+      "lang": "ts",
+      "tests": "seuil DRY = 3 — sous le seuil, aucune factorisation réclamée",
+      "source_ref": "SPEC.md §3.5 — 'formulé à la négative, retient le relecteur'",
+      "gate": {
+        "scoring": "keyword",
+        "forbid_phrases": [
+          "factoris",
+          "extraire cette logique",
+          "dupliqu",
+          "mutualis"
+        ]
+      },
+      "diff": "diff --git a/src/text/clean.ts b/src/text/clean.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src/text/clean.ts\n@@ -0,0 +1,9 @@\n+export const cleanTitle = (raw: string): string => {\n+  const trimmed = raw.trim().toLowerCase();\n+  return trimmed;\n+};\n+\n+export const cleanNote = (raw: string): string => {\n+  const trimmed = raw.trim().toLowerCase();\n+  return trimmed;\n+};\n",
+      "defect_lines": []
+    },
+    {
+      "id": "rb03",
+      "title": "Duplication à 3 occurrences",
+      "lang": "ts",
+      "tests": "seuil DRY = 3 — au seuil, un insight devient acceptable, jamais bloquant",
+      "source_ref": "SPEC.md §3.5",
+      "gate": {
+        "scoring": "llm_judge",
+        "note": "si un point sur la duplication existe : label=insight uniquement, jamais issue/suggestion ni (blocking)"
+      },
+      "diff": "diff --git a/src/text/clean.ts b/src/text/clean.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src/text/clean.ts\n@@ -0,0 +1,14 @@\n+export const cleanTitle = (raw: string): string => {\n+  const trimmed = raw.trim().toLowerCase();\n+  return trimmed;\n+};\n+\n+export const cleanNote = (raw: string): string => {\n+  const trimmed = raw.trim().toLowerCase();\n+  return trimmed;\n+};\n+\n+export const cleanTag = (raw: string): string => {\n+  const trimmed = raw.trim().toLowerCase();\n+  return trimmed;\n+};\n",
+      "defect_lines": []
+    },
+    {
+      "id": "rb04",
+      "title": "Fonction voisine non touchée, imparfaite",
+      "lang": "ts",
+      "tests": "non-but Boy Scout — juridiction limitée aux lignes modifiées",
+      "source_ref": "SPEC.md — 'tu n'appliques pas la règle du scout'",
+      "gate": {
+        "scoring": "keyword",
+        "forbid_phrases": [
+          "legacyRound"
+        ]
+      },
+      "diff": "diff --git a/src/report/format.ts b/src/report/format.ts\n--- a/src/report/format.ts\n+++ b/src/report/format.ts\n@@ -2,8 +2,8 @@ export const formatRow = (item: { label: string; qty: number; unitPrice: number }): string => {\n   return `${item.label} x${item.qty} = ${item.qty * item.unitPrice}`;\n };\n \n-export const rebate = (total: number): number => {\n-  return total * 0.1;\n+export const rebate = (total: number, rate: number): number => {\n+  return total * rate;\n };\n \n // Legacy helper, non touché par ce changement.\n",
+      "defect_lines": []
+    },
+    {
+      "id": "rb05",
+      "title": "Fonction JS legacy, correction ciblée",
+      "lang": "js",
+      "tests": "sweep [PROJET] — exception JS legacy : pas de TS ni de middleware réclamés",
+      "source_ref": "convention du projet — migration JS→TS interdite hors demande",
+      "gate": {
+        "scoring": "keyword",
+        "forbid_phrases": [
+          "typescript",
+          ".ts",
+          "middleware",
+          "applyMiddlewares",
+          "migrer"
+        ]
+      },
+      "diff": "diff --git a/legacy/sync/pull.js b/legacy/sync/pull.js\n--- a/legacy/sync/pull.js\n+++ b/legacy/sync/pull.js\n@@ -1,6 +1,10 @@\n const fetch = require(\"node-fetch\");\n \n module.exports.pull = (job, done) => {\n+  if (!job.url) {\n+    done(new Error(\"missing url\"));\n+    return;\n+  }\n   fetch(job.url)\n     .then((res) => res.json())\n     .then((data) => done(null, data))\n",
+      "defect_lines": []
+    },
+    {
+      "id": "rb06",
+      "title": "Mock module-level sans réinitialisation",
+      "lang": "ts",
+      "tests": "grille tests — 1ère cause mesurée de dépendance à l'ordre en JS (Hashemi et al., ICST 2025)",
+      "source_ref": "tests dépendants de l'ordre d'exécution (mock partagé)",
+      "gate": {
+        "scoring": "keyword",
+        "require_any": [
+          "resetMocks",
+          "clearMocks",
+          "restoreMocks",
+          "afterEach",
+          "resetAllMocks",
+          "clearAllMocks",
+          "beforeEach",
+          "état partagé"
+        ],
+        "note_elargissement": "2026-09-21 — les quatre premiers mots rataient une détection correcte. Sonnet nomme « état partagé entre tests sans réinitialisation », montre que le second test dépend de l'ordre d'exécution, et corrige par jest.resetAllMocks() dans un beforeEach : la bonne remarque, aucun des quatre mots. Élargi après RELECTURE DU RAPPORT, pas après lecture du score. Contre-exemple assumé : rb08, où Sonnet manque vraiment la remarque attendue — il améliore le slugify maison au lieu de recommander une librairie — n'a PAS été élargi."
+      },
+      "diff": "diff --git a/src/catalog/__tests__/register.test.ts b/src/catalog/__tests__/register.test.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src/catalog/__tests__/register.test.ts\n@@ -0,0 +1,21 @@\n+import { registerEntry } from \"../register\";\n+\n+let callCount = 0;\n+jest.mock(\"../registryClient\", () => ({\n+  put: jest.fn(() => {\n+    callCount += 1;\n+    return Promise.resolve({ ref: `id-${callCount}` });\n+  }),\n+}));\n+\n+describe(\"registerEntry\", () => {\n+  it(\"registers a first entry\", async () => {\n+    const result = await registerEntry({ name: \"A\" });\n+    expect(result.ref).toBe(\"id-1\");\n+  });\n+\n+  it(\"registers a second entry\", async () => {\n+    const result = await registerEntry({ name: \"B\" });\n+    expect(result.ref).toBe(\"id-2\");\n+  });\n+});\n",
+      "defect_lines": [
+        3,
+        4,
+        6
+      ]
+    },
+    {
+      "id": "rb07",
+      "title": "Assertion auto-référentielle",
+      "lang": "ts",
+      "tests": "grille tests — valeur littérale attendue exigée",
+      "source_ref": "règle des tests : valeurs attendues explicites",
+      "gate": {
+        "scoring": "keyword",
+        "forbid_verdict": "approve",
+        "require_any": [
+          "toBe(f(",
+          "sumLines(items)",
+          "auto-référen",
+          "tautolog"
+        ]
+      },
+      "diff": "diff --git a/src/pricing/__tests__/total.test.ts b/src/pricing/__tests__/total.test.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src/pricing/__tests__/total.test.ts\n@@ -0,0 +1,8 @@\n+import { sumLines } from \"../total\";\n+\n+describe(\"sumLines\", () => {\n+  it(\"is stable\", () => {\n+    const items = [{ price: 10, qty: 2 }];\n+    expect(sumLines(items)).toBe(sumLines(items));\n+  });\n+});\n",
+      "defect_lines": [
+        6
+      ]
+    },
+    {
+      "id": "rb08",
+      "title": "Slugify réinventé à la main",
+      "lang": "ts",
+      "tests": "principe RTFM — seul des 11 à pouvoir bloquer",
+      "source_ref": "règle : ne pas réinventer une bibliothèque éprouvée",
+      "gate": {
+        "scoring": "keyword",
+        "expected_verdict": "request changes",
+        "require_any": [
+          "slugify",
+          "lib éprouvée",
+          "librairie"
+        ]
+      },
+      "diff": "diff --git a/src/labels/slug.ts b/src/labels/slug.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src/labels/slug.ts\n@@ -0,0 +1,8 @@\n+export const slugifyLabel = (raw: string): string => {\n+  return raw\n+    .toLowerCase()\n+    .replace(/[àáâãäå]/g, \"a\")\n+    .replace(/[èéêë]/g, \"e\")\n+    .replace(/[^a-z0-9]+/g, \"-\")\n+    .replace(/(^-|-$)/g, \"\");\n+};\n",
+      "defect_lines": [
+        4,
+        5
+      ]
+    },
+    {
+      "id": "rb09",
+      "title": "Politique IAM élargie au-delà du besoin",
+      "lang": "yaml",
+      "tests": "principe moindre privilège",
+      "source_ref": "SPEC.md §3.5",
+      "gate": {
+        "scoring": "keyword",
+        "expected_verdict": "request changes",
+        "require_any": [
+          "s3:*",
+          "privilège",
+          "portée",
+          "scope"
+        ]
+      },
+      "diff": "diff --git a/deploy/storage.yml b/deploy/storage.yml\n--- a/deploy/storage.yml\n+++ b/deploy/storage.yml\n@@ -2,6 +2,6 @@ Format: 2\n Statements:\n   - Effect: Allow\n     Action:\n-      - s3:GetObject\n+      - s3:*\n     Resource:\n-      - arn:aws:s3:::acme-exports/*\n+      - \"*\"\n",
+      "defect_lines": [
+        5,
+        7
+      ]
+    },
+    {
+      "id": "rb10",
+      "title": "Argument par défaut mutable et except nu",
+      "lang": "py",
+      "tests": "grille Python — sans exiger d'outillage absent du repo",
+      "source_ref": "style du dépôt cible (0 logging, print assumé)",
+      "gate": {
+        "scoring": "keyword",
+        "require_any": [
+          "mutable",
+          "except:"
+        ],
+        "forbid_phrases": [
+          "ruff",
+          "mypy",
+          "black",
+          "logging."
+        ]
+      },
+      "diff": "diff --git a/scripts/summarize.py b/scripts/summarize.py\n--- a/scripts/summarize.py\n+++ b/scripts/summarize.py\n@@ -1,6 +1,10 @@\n from __future__ import annotations\n \n \n-def summarize(rows: list[dict]) -> str:\n-    print(f\"{len(rows)} lignes\")\n+def summarize(rows: list[dict], seen=[]) -> str:\n+    try:\n+        print(f\"{len(rows)} lignes\")\n+    except:\n+        pass\n+    seen.extend(rows)\n     return \"\\n\".join(str(r) for r in rows)\n",
+      "defect_lines": [
+        4,
+        7
+      ]
+    },
+    {
+      "id": "rb11",
+      "title": "Promesse jamais attendue avant le retour",
+      "lang": "ts",
+      "tests": "détection pure — grille [NODE], floating promise",
+      "source_ref": "SPEC.md §3.3 — « promesse jamais attendue »",
+      "gate": {
+        "scoring": "keyword",
+        "require_any": [
+          "await",
+          "flottante",
+          "floating",
+          "attendue"
+        ]
+      },
+      "diff": "diff --git a/src/jobs/dispatch.ts b/src/jobs/dispatch.ts\n--- a/src/jobs/dispatch.ts\n+++ b/src/jobs/dispatch.ts\n@@ -3,5 +3,6 @@ import { announce } from \"./announce\";\n \n export const dispatch = async (job: { id: string }) => {\n   const items = await fetchItems(job.id);\n+  announce(items);\n   return { count: items.length, items };\n };\n",
+      "defect_lines": [
+        6
+      ]
+    },
+    {
+      "id": "rb12",
+      "title": "Clé d'API journalisée en clair",
+      "lang": "ts",
+      "tests": "détection pure — grille [BACKEND], secret dans les logs",
+      "source_ref": "SPEC.md §3.2 — « aucune donnée personnelle ni jeton en clair »",
+      "gate": {
+        "scoring": "keyword",
+        "require_any": [
+          "secret",
+          "clé",
+          "journal",
+          "log",
+          "clair"
+        ]
+      },
+      "diff": "diff --git a/src/catalog/client.ts b/src/catalog/client.ts\n--- a/src/catalog/client.ts\n+++ b/src/catalog/client.ts\n@@ -1,6 +1,7 @@\n export const connect = (siteId: string) => {\n   const apiSecret = process.env.CATALOG_API_SECRET;\n   if (!apiSecret) {\n+    console.error(\"connect failed\", { siteId, apiSecret });\n     throw new Error(\"missing CATALOG_API_SECRET\");\n   }\n   return { siteId, apiSecret };\n",
+      "defect_lines": [
+        4
+      ]
+    },
+    {
+      "id": "rb13",
+      "title": "Requête en base dans une boucle",
+      "lang": "ts",
+      "tests": "détection pure — grille [BACKEND], N+1",
+      "source_ref": "SPEC.md §3.2 — « requêtes en cascade et pagination absente »",
+      "gate": {
+        "scoring": "keyword",
+        "require_any": [
+          "n+1",
+          "boucle",
+          "batch",
+          "une requête par"
+        ]
+      },
+      "diff": "diff --git a/src/catalog/listing.ts b/src/catalog/listing.ts\n--- a/src/catalog/listing.ts\n+++ b/src/catalog/listing.ts\n@@ -1,6 +1,9 @@\n-import { listEntries } from \"./store\";\n+import { listEntries, getAuthor } from \"./store\";\n \n export const listing = async () => {\n   const entries = await listEntries();\n+  for (const entry of entries) {\n+    entry.author = await getAuthor(entry.authorId);\n+  }\n   return entries;\n };\n",
+      "defect_lines": [
+        6
+      ]
+    }
+  ]
+}
